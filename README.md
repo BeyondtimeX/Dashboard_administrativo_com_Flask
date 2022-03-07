@@ -1,1 +1,1 @@
-# digital_one_flask
+# Projeto: Desenvolvendo um dashboard administrativo com Flask

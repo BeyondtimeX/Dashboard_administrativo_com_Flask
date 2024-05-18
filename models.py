@@ -11,18 +11,22 @@ from flask_login import UserMixin
 config = app_config[app_active]
 manager = None
 
-if __name__ == '__main__':
+def create_app(config_name):
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = config.SQLALCHEMY_DATABASE_URI
+    app.config.from_object(config_name)
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    db = SQLAlchemy(app)
-    migrate = Migrate(app, db)
+    db.init_app(app)
+    migrate.init_app(app, db)
+    
+    return app
 
-    manager = Manager(app)
-    manager.add_command('db', MigrateCommand)
-else:
-    db = SQLAlchemy(config.APP)
+db = SQLAlchemy()
+migrate = Migrate()
+
+app = create_app(config)
+manager = Manager(app)
+manager.add_command('db', MigrateCommand)
 
 class Role(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -36,11 +40,11 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(40), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
-    date_created = db.Column(db.DateTime(6), default=db.func.current_timestamp(), nullable=False)
-    last_update = db.Column(db.DateTime(6), onupdate=db.func.current_timestamp(), nullable=True)
-    active = db.Column(db.Boolean(), default=1, nullable=True)
-    role = db.Column(db.Integer, db.ForeignKey(Role.id), nullable=False)
-    funcao = relationship(Role)
+    date_created = db.Column(db.DateTime, default=db.func.current_timestamp(), nullable=False)
+    last_update = db.Column(db.DateTime, onupdate=db.func.current_timestamp(), nullable=True)
+    active = db.Column(db.Boolean, default=True, nullable=True)
+    role_id = db.Column(db.Integer, db.ForeignKey('role.id'), nullable=False)
+    role = relationship('Role', backref='users')
 
     def __repr__(self):
         return '%s - %s' % (self.id, self.username)
@@ -48,17 +52,8 @@ class User(db.Model, UserMixin):
     def set_password(self, password):
         self.password = pbkdf2_sha256.hash(password)
 
-    def hash_password(self, password):
-        try:
-            return pbkdf2_sha256.hash(password)
-        except Exception as e:
-            print("Erro ao criptografar senha %s" % e)
-
-    def verify_password(self, password_no_hash, password_database):
-        try:
-            return pbkdf2_sha256.verify(password_no_hash, password_database)
-        except ValueError:
-            return False
+    def verify_password(self, password_no_hash):
+        return pbkdf2_sha256.verify(password_no_hash, self.password)
 
 class State(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -67,14 +62,12 @@ class State(db.Model):
     def __repr__(self):
         return self.name
 
-
 class DiseaseState(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(40), unique=True, nullable=False)
 
     def __repr__(self):
         return self.name
-
 
 disease_patient = db.Table('disease_patient',
     db.Column('disease_id', db.Integer, db.ForeignKey('disease.id')),
@@ -84,12 +77,12 @@ disease_patient = db.Table('disease_patient',
 class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(40), unique=True, nullable=False)
-    state = db.Column(db.Integer, db.ForeignKey(State.id), nullable=False)
-    diseaseState = db.Column(db.Integer, db.ForeignKey(DiseaseState.id), nullable=False)
-    estado = relationship(State)
-    last_state = db.Column(db.Date, onupdate=db.func.current_timestamp(), nullable=True)
-    estadoSaude = relationship(DiseaseState)
-    diseases = db.relationship('Disease', secondary=disease_patient, backref=db.backref('patients', lazy=True))
+    state_id = db.Column(db.Integer, db.ForeignKey('state.id'), nullable=False)
+    disease_state_id = db.Column(db.Integer, db.ForeignKey('disease_state.id'), nullable=False)
+    last_state_update = db.Column(db.DateTime, onupdate=db.func.current_timestamp(), nullable=True)
+    state = relationship('State', backref='patients')
+    disease_state = relationship('DiseaseState', backref='patients')
+    diseases = db.relationship('Disease', secondary=disease_patient, backref=db.backref('patients', lazy='dynamic'))
 
     def __repr__(self):
         return self.name
@@ -100,7 +93,6 @@ class Disease(db.Model):
 
     def __repr__(self):
         return self.name
-
 
 if __name__ == '__main__':
     manager.run()

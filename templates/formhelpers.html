@@ -1,10 +1,10 @@
-{% macro render_field(field) %}
-  <div class="form-group checkbox mb-3">
-    {{ field.label }}
-    {{ field(**kwargs)|safe }}
+{% macro render_field(field, **kwargs) %}
+  <div class="form-group mb-3">
+    {{ field.label(class="form-label") }}
+    {{ field(class="form-control", **kwargs)|safe }}
     {% if field.errors %}
         {% for error in field.errors %}
-            <small id="emailHelp" class="form-text text-muted text-left" style="color:#a94442;display: block;">{{error}}</small>
+            <small class="form-text text-muted text-left" style="color: #a94442;">{{ error }}</small>
         {% endfor %}
     {% endif %}
   </div>

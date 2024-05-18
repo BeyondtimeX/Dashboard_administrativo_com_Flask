@@ -1,35 +1,48 @@
-from models import *
+from models import db, User, State, Patient, Disease
 from sqlalchemy import or_
 
 def login(email, password):
     try:
-        user = User.query.filter(or_(User.email==email, User.username==email)).first()
-        if user:
-            result = user.verify_password(password, user.password)
-            if result:
-                return user
+        user = User.query.filter(or_(User.email == email, User.username == email)).first()
+        if user and user.verify_password(password):
+            return user
     except Exception as e:
-        print(e)
-
+        print(f"Error during login: {e}")
     return None
 
-def getUserById(id):
+def get_user_by_id(user_id):
     try:
-        return User.query.filter_by(id=id).first()
-    except:
+        return User.query.get(user_id)
+    except Exception as e:
+        print(f"Error retrieving user by ID: {e}")
         return None
 
-def reportByState(state, disease):
-    patients = db.session.query(db.func.count(Patient.estadoSaude), Patient.last_state, Patient.state).group_by(Patient.last_state).group_by(Patient.state)
+def report_by_state(state=None, disease=None):
+    try:
+        query = db.session.query(
+            db.func.count(Patient.id).label('total'),
+            Patient.last_state,
+            Patient.state
+        ).group_by(Patient.last_state, Patient.state)
+        
+        if state:
+            query = query.filter(Patient.state == state)
+        if disease:
+            query = query.filter(Patient.diseases.any(Disease.id.in_(disease)))
 
-    if state:
-        patients = patients.filter(Patient.state==state)
-    if disease:
-        patients = patients.filter(Patient.diseases.any(Disease.id.in_(disease)))
+        patients = query.all()
 
-    patients = patients.all()
-    return [{
-        'total': patient[0],
-        'data': patient[1],
-        'state': State.query.filter_by(id=patient[2]).first().name,
-    } for patient in patients]
+        return [{
+            'total': patient.total,
+            'data': patient.last_state,
+            'state': State.query.get(patient.state).name
+        } for patient in patients]
+
+    except Exception as e:
+        print(f"Error generating report: {e}")
+        return []
+
+# Example usage:
+# user = login('email@example.com', 'password123')
+# user = get_user_by_id(1)
+# report = report_by_state(state=1, disease=[1, 2])

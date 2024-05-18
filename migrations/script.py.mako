@@ -17,8 +17,10 @@ depends_on = ${repr(depends_on)}
 
 
 def upgrade():
+    """Perform the upgrade actions."""
     ${upgrades if upgrades else "pass"}
 
 
 def downgrade():
+    """Perform the downgrade actions."""
     ${downgrades if downgrades else "pass"}
